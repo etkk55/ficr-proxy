@@ -32,20 +32,21 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-// Dati test simulati
+// Dati test statici - formato FICR compatibile
 app.get('/test', (req, res) => {
-  const testData = [
-    { n: '27',  p: 'ROSSI Marco',      g: 3, j: 95234,  t: 285702 },
-    { n: '14',  p: 'BIANCHI Luca',     g: 3, j: 96512,  t: 289536 },
-    { n: '55',  p: 'VERDI Giuseppe',   g: 3, j: 97891,  t: 293673 },
-    { n: '8',   p: 'NERI Alessandro',  g: 2, j: 98234,  t: 196468 },
-    { n: '33',  p: 'GIALLI Franco',    g: 2, j: 99102,  t: 198204 },
-    { n: '71',  p: 'RUSSO Antonio',    g: 2, j: 100456, t: 200912 }
+  const header = { k: '3:00', l: '3:00' };
+  const piloti = [
+    { b: '27', c: 'ROSSI Marco',      j: '3', h: '1:35.234', q: '1', s: '' },
+    { b: '14', c: 'BIANCHI Luca',     j: '3', h: '1:36.512', q: '2', s: '0:03.200' },
+    { b: '55', c: 'VERDI Giuseppe',   j: '3', h: '1:37.891', q: '3', s: '0:06.500' },
+    { b: '8',  c: 'NERI Alessandro',  j: '2', h: '1:38.234', q: '4', s: '1:35.000' },
+    { b: '33', c: 'GIALLI Franco',    j: '2', h: '1:39.102', q: '5', s: '1:38.000' },
+    { b: '71', c: 'RUSSO Antonio',    j: '2', h: '1:40.456', q: '6', s: '1:41.000' }
   ];
-  res.json(testData);
+  res.json([header, piloti]);
 });
 
-// Dati test dinamici (simula gara in corso)
+// Dati test dinamici (simula gara in corso) - formato FICR compatibile
 let testStartTime = null;
 app.get('/test/live', (req, res) => {
   if (req.query.reset === '1') {
@@ -60,32 +61,50 @@ app.get('/test/live', (req, res) => {
   const elapsed = Date.now() - testStartTime;
   const lapTime = 95000; // ~1:35 per giro
   
+  // Formato tempo: "M:SS.mmm"
+  function formatTime(ms) {
+    const min = Math.floor(ms / 60000);
+    const sec = Math.floor((ms % 60000) / 1000);
+    const millis = ms % 1000;
+    return `${min}:${sec.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+  }
+  
   const pilots = [
-    { n: '27', p: 'ROSSI Marco' },
-    { n: '14', p: 'BIANCHI Luca' },
-    { n: '55', p: 'VERDI Giuseppe' },
-    { n: '8',  p: 'NERI Alessandro' },
-    { n: '33', p: 'GIALLI Franco' },
-    { n: '71', p: 'RUSSO Antonio' }
+    { num: '27', name: 'ROSSI Marco' },
+    { num: '14', name: 'BIANCHI Luca' },
+    { num: '55', name: 'VERDI Giuseppe' },
+    { num: '8',  name: 'NERI Alessandro' },
+    { num: '33', name: 'GIALLI Franco' },
+    { num: '71', name: 'RUSSO Antonio' }
   ];
   
-  const data = pilots.map((pilot, i) => {
+  const pilotiArray = pilots.map((pilot, i) => {
     const offset = i * 3000; // 3s distacco tra piloti
     const pilotElapsed = Math.max(0, elapsed - offset);
     const giri = Math.floor(pilotElapsed / lapTime);
-    const lastLapMs = giri > 0 ? lapTime + (Math.random() * 2000 - 1000) : 0;
-    const totalMs = giri * lapTime + (Math.random() * 1000);
+    const lastLapMs = giri > 0 ? lapTime + Math.floor(Math.random() * 2000 - 1000) : 0;
+    const distaccoMs = i * 3000;
     
     return {
-      n: pilot.n,
-      p: pilot.p,
-      g: giri,
-      j: Math.round(lastLapMs),
-      t: Math.round(totalMs)
+      b: pilot.num,           // numero pilota
+      c: pilot.name,          // nome pilota
+      j: giri.toString(),     // giri completati
+      h: formatTime(lastLapMs), // ultimo tempo giro (stringa)
+      q: (i + 1).toString(),  // posizione
+      s: i === 0 ? '' : formatTime(distaccoMs) // distacco dal primo
     };
   });
   
-  res.json(data);
+  // Header gara (formato FICR)
+  const elapsedMin = Math.floor(elapsed / 60000);
+  const elapsedSec = Math.floor((elapsed % 60000) / 1000);
+  const header = {
+    k: `${elapsedMin}:${elapsedSec.toString().padStart(2, '0')}`, // tempo trascorso
+    l: '6:00' // tempo rimanente (fisso per test)
+  };
+  
+  // Formato FICR: [header, [piloti]]
+  res.json([header, pilotiArray]);
 });
 
 const PORT = process.env.PORT || 3000;
