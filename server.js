@@ -47,18 +47,24 @@ app.get('/test', (req, res) => {
 });
 
 // Dati test dinamici (simula gara in corso) - formato FICR compatibile
-let testStartTime = null;
+// SESSIONI: ogni sessionId ha il suo timer indipendente
+const sessions = {};
+
 app.get('/test/live', (req, res) => {
+  const sessionId = req.query.session || 'default';
+  
+  // Reset sessione specifica
   if (req.query.reset === '1') {
-    testStartTime = Date.now();
-    return res.json({ message: 'Timer reset', startTime: testStartTime });
+    sessions[sessionId] = Date.now();
+    return res.json({ message: 'Timer reset', session: sessionId, startTime: sessions[sessionId] });
   }
   
-  if (!testStartTime) {
-    testStartTime = Date.now();
+  // Prima chiamata di questa sessione: inizializza timer
+  if (!sessions[sessionId]) {
+    sessions[sessionId] = Date.now();
   }
   
-  const elapsed = Date.now() - testStartTime;
+  const elapsed = Date.now() - sessions[sessionId];
   const lapTime = 95000; // ~1:35 per giro
   
   // Formato tempo: "M:SS.mmm"
@@ -114,4 +120,6 @@ app.listen(PORT, () => {
   console.log(`   /proxy?url= → proxy FICR`);
   console.log(`   /test       → dati statici`);
   console.log(`   /test/live  → simulazione gara`);
+  console.log(`   /test/live?session=XXX → sessione dedicata`);
+  console.log(`   /test/live?session=XXX&reset=1 → reset sessione`);
 });
