@@ -35,15 +35,22 @@ app.get('/test', (req, res) => {
 });
 
 const sessions = {};
+
+// Ogni pilota ha variazioni DIVERSE e FISSE (±300-800ms)
 const pilotDefinitions = [
-  { num: '27', name: 'ROSSI Marco', baseTime: 93500, startPos: 1 },
-  { num: '14', name: 'BIANCHI Luca', baseTime: 92800, startPos: 4 },
-  { num: '55', name: 'VERDI Giuseppe', baseTime: 94000, startPos: 2 },
-  { num: '8', name: 'NERI Alessandro', baseTime: 93200, startPos: 6 },
-  { num: '33', name: 'GIALLI Franco', baseTime: 95500, startPos: 3 },
-  { num: '71', name: 'RUSSO Antonio', baseTime: 96000, startPos: 5 }
+  { num: '27', name: 'ROSSI Marco', baseTime: 93500, startPos: 1, 
+    variations: [0, -400, 700, -300, 500, -600, 300, -500, 400, -200] },
+  { num: '14', name: 'BIANCHI Luca', baseTime: 92800, startPos: 4,
+    variations: [0, -300, 400, -500, 300, -400, 600, -300, 500, -400] },
+  { num: '55', name: 'VERDI Giuseppe', baseTime: 94000, startPos: 2,
+    variations: [0, -500, 300, -400, 600, -300, 400, -700, 300, -500] },
+  { num: '8', name: 'NERI Alessandro', baseTime: 93200, startPos: 6,
+    variations: [0, -600, 500, -300, 400, -500, 300, -400, 700, -300] },
+  { num: '33', name: 'GIALLI Franco', baseTime: 95500, startPos: 3,
+    variations: [0, -300, 800, -500, 300, -700, 500, -300, 600, -400] },
+  { num: '71', name: 'RUSSO Antonio', baseTime: 96000, startPos: 5,
+    variations: [0, -400, 600, -300, 700, -400, 300, -600, 400, -500] }
 ];
-const lapVariations = [0, -200, 100, -300, 200, -100, 300, -200, 100, 0];
 
 function formatTime(ms) {
   const min = Math.floor(ms / 60000);
@@ -75,7 +82,7 @@ app.get('/test/live', (req, res) => {
     let totalTime = 0, laps = 0, lastLapTime = 0;
     
     while (totalTime < pilotElapsed && laps < 20) {
-      const variation = lapVariations[laps % lapVariations.length];
+      const variation = pilot.variations[laps % pilot.variations.length];
       const thisLapTime = pilot.baseTime + variation;
       if (totalTime + thisLapTime <= pilotElapsed) {
         totalTime += thisLapTime;
