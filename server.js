@@ -64,7 +64,7 @@ app.get('/test/live', (req, res) => {
     sessions[sessionId] = Date.now();
   }
   
-  const elapsed = Date.now() - sessions[sessionId];
+  const elapsed = Date.now() - sessions[sessionId] + 120000; // +2min per demo veloce
   const lapTime = 95000; // ~1:35 per giro
   
   // Formato tempo: "M:SS.mmm"
