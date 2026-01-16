@@ -79,7 +79,7 @@ app.get('/test/live', (req, res) => {
   const pilotStates = pilotDefinitions.map((pilot) => {
     const startDelay = (pilot.startPos - 1) * 800;
     const pilotElapsed = Math.max(0, elapsed - startDelay);
-    let totalTime = 0, laps = 0, lastLapTime = 0;
+    let totalTime = 0, laps = 0, lastLapTime = pilot.baseTime; // Default: tempo base stimato
     
     while (totalTime < pilotElapsed && laps < 20) {
       const variation = pilot.variations[laps % pilot.variations.length];
@@ -90,23 +90,53 @@ app.get('/test/live', (req, res) => {
         laps++;
       } else break;
     }
-    return { num: pilot.num, name: pilot.name, laps, totalTime, lastLapTime };
+    
+    // IMPORTANTE: Giro minimo = 1 (in pista dal primo istante)
+    // Se laps = 0, significa "primo giro in corso" → mostra giro 1 con tempo stimato
+    const displayLaps = Math.max(1, laps);
+    const displayLapTime = laps === 0 ? pilot.baseTime : lastLapTime;
+    
+    return { 
+      num: pilot.num, 
+      name: pilot.name, 
+      laps: displayLaps,
+      actualLaps: laps, // Per calcolo posizione
+      totalTime: totalTime,
+      lastLapTime: displayLapTime,
+      startPos: pilot.startPos
+    };
   });
   
-  pilotStates.sort((a, b) => b.laps !== a.laps ? b.laps - a.laps : a.totalTime - b.totalTime);
+  // Ordina: prima per giri reali completati, poi per tempo totale (o posizione partenza se giro 0)
+  pilotStates.sort((a, b) => {
+    if (b.actualLaps !== a.actualLaps) return b.actualLaps - a.actualLaps;
+    if (a.actualLaps === 0) {
+      // Durante il primo giro, ordina per posizione di partenza
+      return a.startPos - b.startPos;
+    }
+    return a.totalTime - b.totalTime;
+  });
   
+  const leaderLaps = pilotStates[0].actualLaps;
   const leaderTime = pilotStates[0].totalTime;
-  const leaderLaps = pilotStates[0].laps;
   
   const pilotiArray = pilotStates.map((pilot, pos) => {
     let gap = '';
     if (pos > 0) {
-      if (pilot.laps === leaderLaps) gap = formatGap(pilot.totalTime - leaderTime);
-      else gap = '+' + (leaderLaps - pilot.laps) + ' giro';
+      if (pilot.actualLaps === leaderLaps) {
+        if (leaderLaps === 0) {
+          // Durante primo giro, gap basato su posizione partenza
+          gap = formatGap((pilot.startPos - pilotStates[0].startPos) * 800);
+        } else {
+          gap = formatGap(pilot.totalTime - leaderTime);
+        }
+      } else {
+        gap = '+' + (leaderLaps - pilot.actualLaps) + ' giro';
+      }
     }
     return {
       b: pilot.num, c: pilot.name, j: pilot.laps.toString(),
-      h: pilot.lastLapTime > 0 ? formatTime(pilot.lastLapTime) : '0:00.000',
+      h: formatTime(pilot.lastLapTime),
       q: (pos + 1).toString(), s: gap
     };
   });
