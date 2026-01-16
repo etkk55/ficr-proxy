@@ -99,7 +99,7 @@ app.get('/test/live', (req, res) => {
     return { 
       num: pilot.num, 
       name: pilot.name, 
-      laps: displayLaps,
+      laps: laps,
       actualLaps: laps, // Per calcolo posizione
       totalTime: totalTime,
       lastLapTime: displayLapTime,
@@ -135,7 +135,7 @@ app.get('/test/live', (req, res) => {
       }
     }
     return {
-      b: pilot.num, c: pilot.name, j: pilot.laps.toString(),
+      b: pilot.num, c: pilot.name, j: pilot.actualLaps.toString(),
       h: formatTime(pilot.lastLapTime),
       q: (pos + 1).toString(), s: gap
     };
