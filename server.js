@@ -109,6 +109,12 @@ app.post('/demo/reset', (req, res) => {
   res.json({ success: true, message: 'Demo race reset' });
 });
 
+// Reset demo race (GET - per comodità test browser)
+app.get('/demo/reset', (req, res) => {
+  resetDemo();
+  res.json({ success: true, message: 'Demo race reset', timestamp: Date.now() });
+});
+
 // Demo status
 app.get('/demo/status', (req, res) => {
   if (!demoData) {
@@ -138,7 +144,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     name: 'FICR Proxy Server',
-    version: '2.0.0',
+    version: '2.0.1',
     endpoints: {
       '/proxy?u=USER&c=CODE': 'Proxy FICR data (use c=demo for captured race)',
       '/demo/status': 'Get demo race status',
