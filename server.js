@@ -1,6 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 
+
+// === SAFETY: previeni crash su errori non gestiti ===
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err.message || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.message || err);
+});
 const fs = require('fs');
 const path = require('path');
 
@@ -85,9 +93,10 @@ app.get('/proxy', async (req, res) => {
   
   try {
     const response = await fetch(ficrUrl, {
+      signal: AbortSignal.timeout(10000),  // 10s max
       headers: {
         'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
       }
     });
     
@@ -144,7 +153,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     name: 'FICR Proxy Server',
-    version: '2.0.1',
+    version: '2.0.2',
     endpoints: {
       '/proxy?u=USER&c=CODE': 'Proxy FICR data (use c=demo for captured race)',
       '/demo/status': 'Get demo race status',
