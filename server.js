@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 // === SAFETY: previeni crash su errori non gestiti ===
 process.on('unhandledRejection', (err) => {
@@ -9,12 +11,40 @@ process.on('unhandledRejection', (err) => {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err.message || err);
 });
-const fs = require('fs');
-const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ============================================
+// FETCH FICR con bypass SSL (certificato non valido)
+// Usa https.request nativo — nessuna env var necessaria
+// ============================================
+function fetchFICR(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      rejectUnauthorized: false,   // bypass SSL FICR
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json'
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve({ ok: res.statusCode < 400, status: res.statusCode, json: () => JSON.parse(data) });
+        } catch (e) {
+          reject(new Error('Invalid JSON from FICR'));
+        }
+      });
+    });
+    req.setTimeout(10000, () => {
+      req.destroy(new Error('FICR request timeout (10s)'));
+    });
+    req.on('error', reject);
+  });
+}
 
 // ============================================
 // DATI FICR REALI (gara demo)
@@ -25,7 +55,6 @@ let demoState = {
   currentIndex: 0
 };
 
-// Carica dati demo se disponibili
 try {
   const dataPath = path.join(__dirname, 'ficr-demo-data.json');
   if (fs.existsSync(dataPath)) {
@@ -36,28 +65,20 @@ try {
   console.log('Demo data not found, will use simulation');
 }
 
-// Reset demo race
 function resetDemo() {
   demoState.startTime = Date.now();
   demoState.currentIndex = 0;
   console.log('Demo race reset');
 }
 
-// Get current demo snapshot based on elapsed time
 function getDemoSnapshot() {
   if (!demoData) return null;
-  
-  if (!demoState.startTime) {
-    resetDemo();
-  }
+  if (!demoState.startTime) resetDemo();
   
   const elapsed = (Date.now() - demoState.startTime) / 1000;
   const interval = demoData.intervalSeconds || 3;
-  
-  // Calcola indice basato su tempo trascorso
   let index = Math.floor(elapsed / interval);
   
-  // Loop alla fine
   if (index >= demoData.totalSnapshots) {
     resetDemo();
     index = 0;
@@ -71,11 +92,9 @@ function getDemoSnapshot() {
 // ENDPOINT PRINCIPALE
 // ============================================
 
-// Proxy FICR con supporto demo
 app.get('/proxy', async (req, res) => {
   const { u, c } = req.query;
   
-  // Se codice gara = demo, usa dati reali catturati
   if (c === 'demo' && demoData) {
     const snapshot = getDemoSnapshot();
     if (snapshot) {
@@ -84,7 +103,6 @@ app.get('/proxy', async (req, res) => {
     }
   }
   
-  // Altrimenti proxy a FICR reale
   if (!u || !c) {
     return res.status(400).json({ error: 'Missing parameters u and c' });
   }
@@ -92,19 +110,11 @@ app.get('/proxy', async (req, res) => {
   const ficrUrl = `https://www.livetiming.ficr.it/${u}/dataSend.php?u=${u}&c=${c}`;
   
   try {
-    const response = await fetch(ficrUrl, {
-      signal: AbortSignal.timeout(10000),  // 10s max
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json',
-      }
-    });
-    
+    const response = await fetchFICR(ficrUrl);
     if (!response.ok) {
       throw new Error(`FICR responded with ${response.status}`);
     }
-    
-    const data = await response.json();
+    const data = response.json();
     res.json(data);
   } catch (error) {
     console.error('FICR proxy error:', error.message);
@@ -112,24 +122,18 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-// Reset demo race
 app.post('/demo/reset', (req, res) => {
   resetDemo();
   res.json({ success: true, message: 'Demo race reset' });
 });
 
-// Reset demo race (GET - per comodità test browser)
 app.get('/demo/reset', (req, res) => {
   resetDemo();
   res.json({ success: true, message: 'Demo race reset', timestamp: Date.now() });
 });
 
-// Demo status
 app.get('/demo/status', (req, res) => {
-  if (!demoData) {
-    return res.json({ available: false });
-  }
-  
+  if (!demoData) return res.json({ available: false });
   const elapsed = demoState.startTime ? (Date.now() - demoState.startTime) / 1000 : 0;
   res.json({
     available: true,
@@ -140,7 +144,6 @@ app.get('/demo/status', (req, res) => {
   });
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -149,11 +152,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Info endpoint
 app.get('/', (req, res) => {
   res.json({
     name: 'FICR Proxy Server',
-    version: '2.0.2',
+    version: '2.1.0',
     endpoints: {
       '/proxy?u=USER&c=CODE': 'Proxy FICR data (use c=demo for captured race)',
       '/demo/status': 'Get demo race status',
@@ -166,6 +168,7 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`FICR Proxy running on port ${PORT}`);
+  console.log(`FICR Proxy v2.1.0 running on port ${PORT}`);
   console.log(`Demo data: ${demoData ? 'LOADED' : 'NOT AVAILABLE'}`);
+  console.log(`SSL bypass: ENABLED via https.Agent`);
 });
