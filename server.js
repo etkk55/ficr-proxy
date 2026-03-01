@@ -93,9 +93,10 @@ function getDemoSnapshot() {
 // ============================================
 
 app.get('/proxy', async (req, res) => {
-  const { u, c } = req.query;
+  const { u, c, url } = req.query;
   
-  if (c === 'demo' && demoData) {
+  // Modalità DEMO
+  if ((c === 'demo' || (url && url.includes('c=demo'))) && demoData) {
     const snapshot = getDemoSnapshot();
     if (snapshot) {
       console.log(`Demo: serving snapshot ${snapshot.sequence}/${demoData.totalSnapshots}`);
@@ -103,11 +104,18 @@ app.get('/proxy', async (req, res) => {
     }
   }
   
-  if (!u || !c) {
-    return res.status(400).json({ error: 'Missing parameters u and c' });
+  // Costruisce URL FICR — accetta sia ?url=<encodato> (client MX) che ?u=&c=
+  let ficrUrl;
+  if (url) {
+    ficrUrl = decodeURIComponent(url);
+    if (!ficrUrl.includes('livetiming.ficr.it')) {
+      return res.status(400).json({ error: 'Invalid FICR URL' });
+    }
+  } else if (u && c) {
+    ficrUrl = `https://www.livetiming.ficr.it/${u}/dataSend.php?u=${u}&c=${c}`;
+  } else {
+    return res.status(400).json({ error: 'Missing parameters: use ?url= or ?u=&c=' });
   }
-  
-  const ficrUrl = `https://www.livetiming.ficr.it/${u}/dataSend.php?u=${u}&c=${c}`;
   
   try {
     const response = await fetchFICR(ficrUrl);
