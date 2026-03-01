@@ -1,5 +1,4 @@
 const express = require('express');
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const cors = require('cors');
 
 
@@ -154,7 +153,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     name: 'FICR Proxy Server',
-    version: '2.0.3',
+    version: '2.0.2',
     endpoints: {
       '/proxy?u=USER&c=CODE': 'Proxy FICR data (use c=demo for captured race)',
       '/demo/status': 'Get demo race status',
