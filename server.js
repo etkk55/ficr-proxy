@@ -154,7 +154,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     name: 'FICR Proxy Server',
-    version: '2.0.2',
+    version: '2.0.3',
     endpoints: {
       '/proxy?u=USER&c=CODE': 'Proxy FICR data (use c=demo for captured race)',
       '/demo/status': 'Get demo race status',
