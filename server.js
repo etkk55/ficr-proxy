@@ -1,4 +1,5 @@
 const express = require('express');
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const cors = require('cors');
 
 
